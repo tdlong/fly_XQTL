@@ -1,0 +1,70 @@
+######################## 
+# repeat with higher marker density....for a subset of conditions ... and subset of region
+########################
+
+libby = read.table("HMMregA_R2.txt")
+# chr, pos, RIL, 36 diploid, 8 additive
+libby = libby[libby[,1]=="3L",c(1:3,40:47)]
+colnames(libby) = c("chr","pos","RIL","A1","A2","A3","A4","A5","A6","A7","AB8")
+WM = apply(libby[,4:11],1,which.max)
+libby = data.frame(libby[,1:3],founder=WM)
+quantile(libby$pos,seq(0.1,0.9,0.05))
+####  focus on the middle 35%-65% of the chromosome .... ~3-fold reduction in computing a storage
+####  this lets me use a single core per sub-task in next step
+libby2=libby[libby$pos> 8650000 & libby$pos<15900000,]
+write.table(libby2,"libby2.txt")
+#libby2[1:10,]
+
+sbatch scripts/power3.sh
+cat powerdir3/powersim.*.txt > localize.all3.txt
+
+#####  resolution on desktop
+MM=read.table("localize.all3.txt")
+colnames(MM) = c("Pure_Rep_number", "N_RILs_base", "Selection_Intensity", "Ne_Fly_DNA_pool", "Ngen_Random_Mate", "Pos_On_3L", "N_exp_reps", "LOD", "nLOD")
+
+MMint = MM %>%
+	group_by(N_RILs_base, Selection_Intensity, Ne_Fly_DNA_pool, Ngen_Random_Mate, N_exp_reps, Pure_Rep_number) %>%
+	summarize(myint = sum(LOD > (max(LOD)-2)), foundpeak = max(LOD)>4, msm = max(LOD)) %>%
+	ungroup() %>%
+	filter(foundpeak==TRUE) %>%
+	group_by(N_RILs_base, Selection_Intensity, Ne_Fly_DNA_pool, Ngen_Random_Mate, N_exp_reps) %>%
+	summarize(myint2 = 10*mean(myint), mmsm = mean(msm))   # since each interval is 10kb in Libby's steps
+
+out = lm(myint2 ~ poly(mmsm,2) + as.factor(N_RILs_base) + as.factor(Selection_Intensity) + as.factor(Ne_Fly_DNA_pool) + as.factor(N_exp_reps), data=MMint)
+anova(out)
+
+Analysis of Variance Table
+
+Response: myint2
+                               Df Sum Sq Mean Sq   F value    Pr(>F)    
+poly(mmsm, 2)                   2 219918  109959 2588.5173 < 2.2e-16 ***
+as.factor(N_RILs_base)          3    348     116    2.7279   0.05739 .  
+as.factor(Selection_Intensity)  1     12      12    0.2708   0.60581    
+as.factor(Ne_Fly_DNA_pool)      1     40      40    0.9452   0.33708    
+as.factor(N_exp_reps)           2   8555    4277  100.6920 6.503e-16 ***
+Residuals                      38   1614      42  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+**  once you account for the size of the LOD, only N_exp_reps effect confidence interval size
+
+
+###  this plot shows the 2LOD support interval size as a function of LOD scored, colored by N_exp_reps
+MMint$N_exp_reps = as.factor(MMint$N_exp_reps)
+pdf("Supp_Figurexx_resolution.pdf",width=4,height=3)
+ggplot(MMint, aes(mmsm, myint2)) +
+  geom_point(aes(color = N_exp_reps)) +
+  xlab("LOD of most significant marker") +
+  ylab("2 LOD support interval (kb)") +
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank()) + 
+  theme(axis.text=element_text(size=6),axis.title=element_text(size=6),label="mono",family="mono") +
+  theme_bw() +
+  theme( 
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor.y = element_blank())
+graphics.off()
+
+
+
