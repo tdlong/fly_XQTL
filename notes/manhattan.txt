@@ -1,0 +1,208 @@
+######################
+####  Manhattan plots = Figure 4
+######################
+
+scp tdlong@hpc.oit.uci.edu:/share/adl/tdlong/fly_pool/allhaps.200kb.txt.gz .
+setwd("~/Desktop")
+xx = read.table("allhaps.200kb.txt.gz",header=TRUE)
+
+library(tidyverse)
+
+anova_full <- function(df){
+	df = data.frame(df)
+	df$Nrep = as.factor(df$rep)
+	df$trt = as.factor(df$trt)
+	df$founder = as.factor(df$founder)
+	df2 = df %>% 
+		mutate(afreq=asin(sqrt(freq))) %>%
+		select(-c(Nrep,freq))
+	
+	out = anova(lm(afreq~trt+founder+founder:trt,data=df2))
+	-pf(out[3,3]/out[4,3],out[3,1],out[4,1],lower.tail=FALSE,log.p=TRUE)/log(10)	
+	}
+
+anova_lessA <- function(df){
+	df = data.frame(df)
+	df$Nrep = as.factor(df$rep)
+	df$trt = as.factor(df$trt)
+	df$founder = as.factor(df$founder)
+	df3 = df %>%
+		mutate(afreq=asin(sqrt(freq))) %>%
+		filter(Nrep != "A" ) %>%
+		select(-c(Nrep,freq))
+	
+	out = anova(lm(afreq~trt+founder+founder:trt,data=df3))
+	-pf(out[3,3]/out[4,3],out[3,1],out[4,1],lower.tail=FALSE,log.p=TRUE)/log(10)	
+	}
+
+anova_lessB <- function(df){
+	df = data.frame(df)
+	df$Nrep = as.factor(df$rep)
+	df$trt = as.factor(df$trt)
+	df$founder = as.factor(df$founder)
+	df3 = df %>%
+		mutate(afreq=asin(sqrt(freq))) %>%
+		filter(Nrep != "B" ) %>%
+		select(-c(Nrep,freq))
+	
+	out = anova(lm(afreq~trt+founder+founder:trt,data=df3))
+	-pf(out[3,3]/out[4,3],out[3,1],out[4,1],lower.tail=FALSE,log.p=TRUE)/log(10)	
+	}
+
+
+###  real distribution
+
+chi2 = xx %>% filter(!is.na(freq)) %>%
+	separate(pool,c("rep","trt","cov")) %>%
+	mutate(cov=recode(cov,'100'='F','25'='Q','10'='T')) %>%
+	filter(chr != "chr4") %>%
+	droplevels() %>%
+	group_by(chr,pos,cov) %>% 
+	nest() %>% 
+	mutate(LOD_full = map(data,anova_full)) %>%
+	mutate(LOD_lessA = map(data,anova_lessA)) %>%
+	mutate(LOD_lessB = map(data,anova_lessB)) %>%
+	select(-data) %>%
+	unnest(cols = c(LOD_full)) %>%
+	unnest(cols = c(LOD_lessA)) %>%
+	unnest(cols = c(LOD_lessB)) %>%
+	mutate(Ichr=recode(chr,'chrX'=1,'chr2L'=2,'chr2R'=3,'chr3L'=4,'chr3R'=5)) %>%
+	unite("ID", chr:pos, remove = FALSE) %>%
+	filter(!is.na(LOD_full) | !is.na(LOD_lessA)) %>%
+	filter( (Ichr==1 & pos>277911 & pos<18930000) | 
+		(Ichr==2 & pos>82455 & pos<19570000) | 
+		(Ichr==3 & pos>8860000 & pos<24684540) | 
+		(Ichr==4 & pos>158639 & pos<18438500) | 
+		(Ichr==5 & pos>9497000 & pos<31845060)  ) 
+
+chi2.F = chi2 %>% filter(cov=="F")
+chi2.Q = chi2 %>% filter(cov=="Q")
+chi2.T = chi2 %>% filter(cov=="T")
+
+# from Stuart, locations of mapped QTL
+SNPsOfInterest = chi2 %>%
+	filter((Ichr==2 & pos>18220000  & pos<19260000 ) |
+		(Ichr==3 & pos>11012495 & pos<11272495 ) |
+		(Ichr==3 & pos>12322495 & pos<12602495 ) |
+		(Ichr==5 & pos>13904278 & pos<14584278 ) )
+SNPsOfInterest = as.character(SNPsOfInterest$ID)	
+
+
+######################
+####  Manhattan
+######################
+############  of course qqman's Manhattan doesn't work ##########
+
+##  function to return a df with cumulative bp positions
+change.chi = function(df){
+	df %>% 
+	# Compute chromosome size
+	group_by(Ichr) %>% 
+	summarise(chr_len=max(pos)) %>% 
+	# Calculate cumulative position of each chromosome
+	mutate(tot=cumsum(chr_len)-chr_len) %>%
+	select(-chr_len) %>%
+	# Add this info to the initial dataset
+	left_join(df, ., by=c("Ichr"="Ichr")) %>%
+	# Add a cumulative position of each SNP
+	arrange(Ichr, pos) %>%
+	mutate( BPcum=pos+tot)
+	}
+
+## function to make plot	
+make.Manhattan = function(df,mychar,mylab,threshold,ylimit){
+	mychar=sym(mychar)
+	myaxis = df %>%
+		group_by(Ichr) %>% 
+		summarize(center=( max(BPcum) + min(BPcum) ) / 2, chrlab = chr[1] )
+
+	ggplot(df, aes_string(x="BPcum", y=mychar)) +
+	ylab("-log10(p)") +
+    xlab("Physical Location (Mb)") +
+	ggtitle(mylab) + 
+	theme(plot.title = element_text(vjust = - 10, hjust=0.025, size=10)) +
+    # Show all points
+    geom_point( aes(color=as.factor(Ichr)), alpha=0.8, size=0.3) +
+    scale_color_manual(values = c("grey30", "grey70", "grey30", "grey70", "grey30")) +
+    # SNPs of interest
+    geom_point(data=subset(df, ID %in% SNPsOfInterest), color="orange", size=0.8) +
+    # threshold
+    geom_hline(yintercept = threshold, linetype = "dashed", colour = "blue") +  
+    # custom X axis:
+    scale_x_continuous(label = myaxis$chrlab, breaks= myaxis$center ) +
+    scale_y_continuous(expand = c(0, 0), limits=c(0,ylimit) ) +     # remove space between plot area and x axis
+    # Custom the theme:
+ 	theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank()) + 
+	theme(axis.text=element_text(size=8),axis.title=element_text(size=10)) + 
+	theme(legend.position = "none")
+	}
+	
+# make.Manhattan(change.chi(chi2.Q),"LOD_full","36X imputation coverage",4,15)
+	
+## plots for full model
+pMan.F = make.Manhattan(change.chi(chi2.F),"LOD_full","142X imputation coverage",4,15)
+pMan.Q = make.Manhattan(change.chi(chi2.Q),"LOD_full","36X imputation coverage",4,15)
+pMan.T = make.Manhattan(change.chi(chi2.T),"LOD_full","14X imputation coverage",4,15)
+  	
+## plots minus replicate A
+pMan.Q.mA = make.Manhattan(change.chi(chi2.Q),"LOD_lessA","less replicate A",4,15)
+## plots minus replicate B
+pMan.Q.mB = make.Manhattan(change.chi(chi2.Q),"LOD_lessB","less replicate B",4,15)
+##
+pMan.Q.lab = make.Manhattan(change.chi(chi2.Q),"LOD_full","36X all replicates",4,15)
+
+
+## add box for Cypd....
+#### make little dataframe defining box
+temp = change.chi(chi2.Q) %>% filter(chr=="chr2R") %>% 
+	select(-chr) %>%
+	filter(pos > 10000000 & pos < 14000000) %>%
+	select(BPcum)
+minbox = min(temp$BPcum)
+maxbox = max(temp$BPcum)
+Cypd_box = data.frame(y=c(0,15,15,0),x=c(minbox,minbox,maxbox,maxbox))
+#### end make box
+# pMan.Q = pMan.Q + geom_polygon(data=Cypd_box, aes(x=x, y=y), colour="red", fill=NA)
+
+tempchi = change.chi(chi2.F) %>% filter(cov=="F")
+temphit2 = hits2 %>% select(ID)
+hits3 = temphit2 %>% left_join(tempchi, by="ID") 
+hits3$QTLname=c("A","B","C","D","E","F","G")
+pMan.F = pMan.F + geom_label(data=hits3,nudge_y = 1.25,aes(label=QTLname))
+
+
+
+library(gridExtra)
+mylayout = rbind(matrix(c(1,2,3),nrow=3))
+# Figure 4
+pdf("composite_full.pdf",width = 7, height = 9)
+grid.arrange(pMan.F, pMan.Q, pMan.T, layout_matrix=mylayout)
+graphics.off()
+
+mylayout = rbind(matrix(c(1,2,3),nrow=3))
+# Supp Figure 4
+pdf("composite_less.pdf",width = 7, height = 9)
+grid.arrange(pMan.Q.lab, pMan.Q.mA, pMan.Q.mB, layout_matrix=mylayout)
+graphics.off()
+
+
+#  call peaks
+
+hits = chi2 %>%
+     filter(cov=="F") %>%
+     select(-cov) %>%
+     mutate(rpos = 1e6*round(pos/1e6,0)) %>%
+     group_by(chr,rpos) %>%
+     filter(LOD_full == max(LOD_full)) %>%
+     filter(LOD_full>4.5)
+
+hits2 = hits[-c(4,5,7,8,10,11,12,14,15,16,18),]
+
+###  Manually find 2 LOD support intervals
+i=7
+out = chi2 %>% select(-c(ID,LOD_lessA,Ichr)) %>%
+	filter(cov=="F") %>% 
+	filter(chr==hits2$chr[i] & pos > (hits2$pos[i] - 2e6) & pos < (hits2$pos[i] + 2e6)) %>%
+	mutate(LODdrop = hits2$LOD_full[i] - LOD_full - 2) %>%
+	print(n=Inf)
+

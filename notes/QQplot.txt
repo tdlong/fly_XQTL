@@ -1,0 +1,59 @@
+################
+#  QQ plots
+################
+#########  grab LOD scores
+
+## actual LODs
+myLOD = chi2 %>% filter(cov=="Q") %>% droplevels() %>% select(c(chr,pos,LOD_full))
+
+## actual LODs, less peaks
+blah=myLOD
+dim(myLOD)
+i=1
+while(i <= nrow(hits2)){
+	tempblah = blah %>% filter(chr != hits2$chr[i] | (chr == hits2$chr[i] & (pos<(hits2$pos[i]-1e6) | pos >(hits2$pos[i]+1e6))))
+	print(c(i,dim(tempblah)[1]))
+	flush.console()
+	blah=tempblah
+	i = i+1
+	}
+myLOD_censor = blah
+
+pdf("QQplots.pdf",width=6, height=6)
+## simulated LODs 
+MMsubset = read.table("false.positive.rate.txt")
+nobs=nrow(MMsubset)
+theory=sort(-log((1:nobs)/nobs-1/(2*nobs))/log(10))
+observed=sort(MMsubset$LOD_control)
+plot(theory,observed,type="p",pch=16,cex=0.5,xlim=c(0,6),ylim=c(0,13))
+myfit=lm(observed~theory-1)
+summary(myfit)
+abline(a=0,b=1,col="grey")
+#abline(myfit,col="black")
+
+Genomewide FPR
+1-(1-sum(MMsubset$LOD_control>4)/nobs)^5
+= 0.22%
+
+
+nobs=length(myLOD$LOD_full)
+theory=sort(-log((1:nobs)/nobs-1/(2*nobs))/log(10))
+observed=sort(myLOD$LOD_full)
+points(theory,observed,type="p",pch=16,cex=0.5,col="blue")
+myfit=lm(observed~theory-1)
+summary(myfit)
+# abline(myfit,col="blue")
+
+nobs=length(myLOD_censor$LOD_full)
+theory=sort(-log((1:nobs)/nobs-1/(2*nobs))/log(10))
+observed=sort(myLOD_censor$LOD_full)
+points(theory,observed,type="p",pch=16,cex=0.5,col="red")
+myfit=lm(observed~theory-1)
+summary(myfit)
+# abline(myfit,col="red")
+
+legend("topleft",legend=c("QTL scan","scan (less peaks)","simulate null","unity"),fill=c("blue","red","black","grey"),bty = "n" )
+
+
+graphics.off()
+

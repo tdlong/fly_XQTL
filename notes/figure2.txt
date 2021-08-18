@@ -1,0 +1,156 @@
+######################
+####  Figure 2 = power(ish)
+####  LOD scores at the causative site as a function of experimental parameters
+######################
+
+# We simulate "power" {actually the distribution of LOD scores under different scenarios}
+# Since we are only looking at the causative marker to calculate power we instantaneously expand the population of founders
+# We further do not recombine the "base" population after founding, since we ONLY simulate a causative site
+# This power calculation assumes all founders are equally frequent  
+
+
+REPS = 250
+#  1 = RIL-bases ... 2 Nindividuals * 2 selection intensity * 4, 8, 12 replicates
+MM = matrix(nrow=REPS*(1+3*2*3),ncol=6)
+cc=1
+for(i in 1:REPS){
+	#8 founders all at equal frequency
+	#Gaussian effects at QTL
+	#QTL accounts for 2% of total variation
+	#heritability of trait is 50%, 10 replicate measure
+	#1000 RILs
+	N = 500
+	g = rnorm(8)
+	RILs = data.frame(f=sample(1:8,N,replace=TRUE))
+	RILs$G = g[RILs$f]
+	RILs$BG = apply(matrix(rnorm(N*24),nrow=N),1,sum)
+	RILs$P = RILs$G + RILs$BG + rnorm(N,0,sqrt(25/10))         # variance of G = 50, but 10 replicate measures
+	out = anova(lm(RILs$P~as.factor(RILs$f)))
+	LOD = -pf(out[1,4],out[1,1,],out[2,1],lower.tail=FALSE,log.p=TRUE)/log(10)
+	# cat(round(var(RILs$G)/var(RILs$P),2),"\t",round(var(RILs$BG)/var(RILs$P),2),"\t",LOD,"\n")
+	MM[cc,] = c(i,0,0,0,LOD,LOD)
+	cc = cc+1 
+	
+	# now the pool experiment
+	NN=20000
+	#  perhaps this is the effective number of flies in the DNA prep, if there are 250, 500, 1000 census????
+	for(NNind in c(150,300,600)){
+		for(intensity in c(0.05,0.10)){
+			# intensity and population size determine size of DNA prepped pool ... and that impacts power
+			# doing the simulation this way, separate selection intensity from pool size
+			lp = 0
+			T3D_true = data.frame(hap=rep(NA,8*2*12),trt=rep(NA,8*2*12),RR=rep(NA,8*2*12),afreq=rep(NA,8*2*12))
+			T3D_control = data.frame(hap=rep(NA,8*2*12),trt=rep(NA,8*2*12),RR=rep(NA,8*2*12),afreq=rep(NA,8*2*12))
+
+			for(mrep in 1:12){
+				Sdad = sample(1:500,NN,replace=TRUE)
+				Smom = sample(1:500,NN,replace=TRUE)
+				D = data.frame(Hd = RILs$f[Sdad], Hm = RILs$f[Smom], G = RILs$G[Sdad] + RILs$G[Smom], BG = RILs$BG[Sdad] + RILs$BG[Smom])
+				D$P = D$G + D$BG + rnorm(NN,sqrt(25))	
+				oo = order(D$P,decreasing=TRUE)[1:(NN*intensity)]
+				Roo1 = sample(1:20000,NNind)
+				Roo2 = sample(1:20000,NNind)
+				Soo = sample(oo,NNind)
+				f_full_1   = (table(factor(D$Hd[Roo1],levels=1:8)) + table(factor(D$Hm[Roo1],levels=1:8))) / (2 * NNind)
+				f_full_2   = (table(factor(D$Hd[Roo2],levels=1:8)) + table(factor(D$Hm[Roo2],levels=1:8))) / (2 * NNind)
+				f_sample = (table(factor(D$Hd[Soo],levels=1:8)) + table(factor(D$Hm[Soo],levels=1:8))) / (2 * NNind)
+
+				TC_1=cbind(1:8, rep("C",8), rep(mrep,8), asin(sqrt(f_full_1)))
+				TC_2=cbind(1:8, rep("S",8), rep(mrep,8), asin(sqrt(f_full_2)))
+				TS=cbind(1:8, rep("S",8), rep(mrep,8), asin(sqrt(f_sample)))
+
+				T3D_true[(16*(mrep-1)+1):(16*mrep),] = rbind(TC_1,TS)		
+				T3D_control[(16*(mrep-1)+1):(16*mrep),] = rbind(TC_1,TC_2)		
+
+				} # rep
+
+			T3D_true$hap = as.factor(T3D_true$hap)
+			T3D_true$trt = as.factor(T3D_true$trt)
+			T3D_true$RR = as.numeric(as.character(T3D_true$RR))
+			T3D_control$hap = as.factor(T3D_control$hap)
+			T3D_control$trt = as.factor(T3D_control$trt)
+			T3D_control$RR = as.numeric(as.character(T3D_control$RR))
+			for(rrep in c(4,8,12)){
+				D_true = T3D_true[T3D_true$RR<=rrep,]
+				D_true$RR = as.factor(D_true$RR)
+				out = anova(lm(afreq~trt+hap+hap:trt,data=D_true))
+				LOD = -pf(out[3,3]/out[4,3],out[3,1],out[4,1],lower.tail=FALSE,log.p=TRUE)/log(10)
+				D_control = T3D_control[T3D_control$RR<=rrep,]
+				D_control$RR = as.factor(D_control$RR)
+				out = anova(lm(afreq~trt+hap+hap:trt,data=D_control))
+				LOD_control = -pf(out[3,3]/out[4,3],out[3,1],out[4,1],lower.tail=FALSE,log.p=TRUE)/log(10)
+				MM[cc,] = c(i,NNind,intensity,rrep,LOD,LOD_control)
+				cc = cc+1
+				}
+			} # intensity
+		} # NN
+	} # reps of entire experiment
+	
+MM = data.frame(MM)
+colnames(MM) = c("i","NNind","intensity","reps","LOD","LOD_control")
+write.table(MM,"single.locus.power.txt")
+MM=read.table("single.locus.power.txt")
+mmtemp = MM %>% mutate(rep2 = reps)
+MM = mmtemp
+
+colorder = c("600.0.05.12","600.0.1.12","300.0.05.12","300.0.1.12","150.0.05.12","150.0.1.12",
+		"600.0.05.8","600.0.1.8","300.0.05.8","300.0.1.8","150.0.05.8","150.0.1.8",
+		"600.0.05.4","600.0.1.4","300.0.05.4","300.0.1.4","150.0.05.4","150.0.1.4",
+		"0.0.0") 
+		     
+mylabels = c("600     5   12","600    10  12","300     5   12","300    10  12","150     5   12","150    10  12",
+		"600     5     8","600    10    8","300     5     8","300    10    8","150     5     8","150    10    8",
+		"600     5     4","600    10    4","300     5     4","300    10    4","150     5     4","150    10    4",
+		"RIL-based  ")
+
+
+colorder2 = c("600.12","300.12","150.12",
+		"600.8","300.8","150.8",
+		"600.4","300.4","150.4") 
+		     
+mylabels2 = c("600   12 ","300   12 ","150   12 ",
+		"600    8 ","300    8 ","150    8 ",
+		"600    4 ","300    4 ","150    4 ")
+
+
+pdf("Figure2_Dist.LODscores.power.pdf",width=4,height=4)
+ggplot(MM, aes(droplevels(interaction(NNind, intensity,reps)), LOD)) +
+  geom_boxplot(outlier.size=-1,color="black",aes(fill=as.factor(rep2))) +
+  coord_flip() +
+  xlab("") +
+  ylab("-log10(p)") +
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank()) + 
+  theme(axis.text=element_text(size=6),axis.title=element_text(size=6),label="mono",family="mono") +
+  scale_x_discrete(limits=colorder,labels=mylabels) +
+  theme_bw() +
+  theme( 
+      legend.position="none",
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor.y = element_blank())
+graphics.off()
+
+pdf("Figure2_Dist.LODscores.control.power.pdf",width=4,height=4)
+MM2 = MM %>% filter(intensity==0.05)
+ggplot(MM2, aes(droplevels(interaction(NNind, reps)), LOD_control)) +
+  geom_boxplot(outlier.size=-1, color="black", aes(fill=as.factor(rep2))) +
+  coord_flip() +
+  xlab("") +
+  ylab("-log10(p)") +
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank()) + 
+  theme(axis.text=element_text(size=6),axis.title=element_text(size=6),label="mono",family="mono") +
+  scale_x_discrete(limits=colorder2,labels=mylabels2) +
+  theme_bw() +
+  theme( 
+      legend.position="none",
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor.y = element_blank())
+graphics.off()
+
+####################
+## end Figure 2 = power
+####################
+

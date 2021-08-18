@@ -1,0 +1,73 @@
+Sample_ID	i7	i5_NovaSeq	Qubit_ng_ul	TapeStation_bp_size	Volume_for_100ng
+Block.A.CON	TTCCAGGT	CAGTGCTT	15.3	306	6.5
+Block.A.TRT	TACGGTCT	TCCATTGC	15.5	327	6.5
+Block.B.CON	AAGACCGT	GTCGATTG	14.9	312	6.7
+Block.B.TRT	CAGGTTCA	ATAACGCC	16.6	326	6
+Block.C.CON	TAGGAGCT	GCCTTAAC	15.6	312	6.4
+Block.C.TRT	TACTCCAG	GGTATAGG	20	322	5
+Block.D.CON	AGTGACCT	TCTAGGAG	15.8	303	6.3
+Block.D.TRT	AGCCTATC	TGCGTAAC	18.9	321	5.3
+
+NOTE --- this experiment is ONLY pA populations .... so I have the edit the founder file to reflect this
+
+####################
+# get data
+cd raw
+sh getdata.sh 
+
+##### getdata.sh
+#Library "LongT_SJM" - Barcode "TTCCAGGT-CAGTGCTT" (129,419,452 paired-sequences)
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P1-TTCCAGGT-CAGTGCTT-READ1-Sequences.txt.gz
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P1-TTCCAGGT-CAGTGCTT-READ2-Sequences.txt.gz
+#Library "LongT_SJM" - Barcode "TACGGTCT-TCCATTGC" (130,637,047 paired-sequences)
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P2-TACGGTCT-TCCATTGC-READ1-Sequences.txt.gz
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P2-TACGGTCT-TCCATTGC-READ2-Sequences.txt.gz
+#Library "LongT_SJM" - Barcode "AAGACCGT-GTCGATTG" (116,120,600 paired-sequences)
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P3-AAGACCGT-GTCGATTG-READ1-Sequences.txt.gz
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P3-AAGACCGT-GTCGATTG-READ2-Sequences.txt.gz
+#Library "LongT_SJM" - Barcode "CAGGTTCA-ATAACGCC" (138,627,880 paired-sequences)
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P4-CAGGTTCA-ATAACGCC-READ1-Sequences.txt.gz
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P4-CAGGTTCA-ATAACGCC-READ2-Sequences.txt.gz
+#Library "LongT_SJM" - Barcode "TAGGAGCT-GCCTTAAC" (108,758,995 paired-sequences)
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P5-TAGGAGCT-GCCTTAAC-READ1-Sequences.txt.gz
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P5-TAGGAGCT-GCCTTAAC-READ2-Sequences.txt.gz
+#Library "LongT_SJM" - Barcode "TACTCCAG-GGTATAGG" (127,411,430 paired-sequences)
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P6-TACTCCAG-GGTATAGG-READ1-Sequences.txt.gz
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P6-TACTCCAG-GGTATAGG-READ2-Sequences.txt.gz
+#Library "LongT_SJM" - Barcode "AGTGACCT-TCTAGGAG" (160,512,828 paired-sequences)
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P7-AGTGACCT-TCTAGGAG-READ1-Sequences.txt.gz
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P7-AGTGACCT-TCTAGGAG-READ2-Sequences.txt.gz
+#Library "LongT_SJM" - Barcode "AGCCTATC-TGCGTAAC" (115,518,999 paired-sequences)
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P8-AGCCTATC-TGCGTAAC-READ1-Sequences.txt.gz
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-P8-AGCCTATC-TGCGTAAC-READ2-Sequences.txt.gz
+#Library "LongT_SJM" - Barcode Not Recognized (85,508,188 paired-sequences)
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-PrNotRecog-READ1-Sequences.txt.gz
+wget http://hts.igb.uci.edu/tdlong20011034/nR028-L1-PrNotRecog-READ2-Sequences.txt.gz
+#####
+
+# sample name to read mapping
+# readname.mappings.txt
+Block.A.CON	nR028-L1-P1-TTCCAGGT-CAGTGCTT-READ1-Sequences.txt.gz	nR028-L1-P1-TTCCAGGT-CAGTGCTT-READ2-Sequences.txt.gz
+Block.A.TRT	nR028-L1-P2-TACGGTCT-TCCATTGC-READ1-Sequences.txt.gz	nR028-L1-P2-TACGGTCT-TCCATTGC-READ2-Sequences.txt.gz
+Block.B.CON	nR028-L1-P3-AAGACCGT-GTCGATTG-READ1-Sequences.txt.gz	nR028-L1-P3-AAGACCGT-GTCGATTG-READ2-Sequences.txt.gz
+Block.B.TRT	nR028-L1-P4-CAGGTTCA-ATAACGCC-READ1-Sequences.txt.gz	nR028-L1-P4-CAGGTTCA-ATAACGCC-READ2-Sequences.txt.gz
+Block.C.CON	nR028-L1-P5-TAGGAGCT-GCCTTAAC-READ1-Sequences.txt.gz	nR028-L1-P5-TAGGAGCT-GCCTTAAC-READ2-Sequences.txt.gz
+Block.C.TRT	nR028-L1-P6-TACTCCAG-GGTATAGG-READ1-Sequences.txt.gz	nR028-L1-P6-TACTCCAG-GGTATAGG-READ2-Sequences.txt.gz
+Block.D.CON	nR028-L1-P7-AGTGACCT-TCTAGGAG-READ1-Sequences.txt.gz	nR028-L1-P7-AGTGACCT-TCTAGGAG-READ2-Sequences.txt.gz
+Block.D.TRT	nR028-L1-P8-AGCCTATC-TGCGTAAC-READ1-Sequences.txt.gz	nR028-L1-P8-AGCCTATC-TGCGTAAC-READ2-Sequences.txt.gz
+
+########## where is the raw data going to be stored ##########  
+This is an automatic acknowledgment that your submission:
+
+SubmissionID:       SUB9283759
+BioProject ID:      PRJNA714149
+Title:			
+
+has been successfully registered with the BioProject database. After review by the database staff, your project information will be accessible with the following link, usually within a few days of the
+release date that you set (or the release of linked data, whichever is first):
+
+http://www.ncbi.nlm.nih.gov/bioproject/714149
+
+Please use the BioProject ID PRJNA714149 with your correspondence and your data submissions.
+
+

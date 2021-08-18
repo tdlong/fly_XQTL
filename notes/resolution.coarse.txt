@@ -1,0 +1,164 @@
+##########
+# Figure 3 -- what is the resolution of the the experiment
+# lower/coarse resolution first
+##########
+########################
+# simulate resolution
+# Simulations include 4,8,16 generations of random mating following creation of the population
+# condition on actual DSPR RIL genotypes
+########################
+
+
+libby = read.table("HMMregA_R2.txt")
+# chr, pos, RIL, 36 diploid, 8 additive
+# these are genotypes of the DSPR RILs available @ www.flyrils.org
+# subset for chromosome 3L only, and only the additive dosage values
+libby = libby[libby[,1]=="3L",c(1:3,40:47)]
+colnames(libby) = c("chr","pos","RIL","A1","A2","A3","A4","A5","A6","A7","AB8")
+# change to hard encoded genotype calls
+test = libby %>% group_by(RIL) %>%
+	filter(row_number() %% 20 == 0) %>%
+	ungroup()
+WM = apply(test[,4:11],1,which.max)
+libby = data.frame(test[,1:3],founder=WM)
+write.table(libby,"libby.txt")
+#libby[1:10,]
+#   chr    pos   RIL founder
+#1   3L 380000 11001       4
+
+module load R/3.4.1
+R
+rn = floor(runif(1000, min=1, max=1e9))
+for(i in 1:1000){
+	cat(rn[i],"\n",file="seeds.txt",append=TRUE)
+	}
+
+###  I put libby.txt and seeds.txt in the "helperfile" folder
+
+sbatch scripts/power2.sh#  edit and rerun with array = 21-1000
+cat powerdir2/powersim.*.txt > localize.all2.txt
+
+## on desktop
+MM=read.table("localize.all2.txt")
+colnames(MM) = c("Pure_Rep_number", "N_RILs_base", "Selection_Intensity", "Ne_Fly_DNA_pool", "Ngen_Random_Mate", "Pos_On_3L", "N_exp_reps", "LOD", "nLOD")
+appender_x <- function(string, prefix = "N=") paste0(prefix,string)
+appender_y <- function(string, prefix = "Nrils=") paste0(prefix,string)
+appender_x2 <- function(string, prefix = "Ngen=") paste0(prefix,string)
+
+
+# average
+pdf("Figure3_localization.pdf",width=7.5,height=5)
+MM.mean <- MM %>% filter(N_exp_reps==8) %>%
+	filter(Ngen_Random_Mate==4) %>%
+	group_by(N_RILs_base, Selection_Intensity, Ne_Fly_DNA_pool, Pos_On_3L) %>%
+	summarise(LOD = mean(LOD))
+
+ggplot(MM.mean, aes(x=Pos_On_3L/1e6,y=LOD)) +
+  geom_line(aes(color=as.factor(Selection_Intensity))) +
+  facet_grid(N_RILs_base ~ Ne_Fly_DNA_pool,labeller=labeller(Ne_Fly_DNA_pool=as_labeller(appender_x),N_RILs_base=as_labeller(appender_y))) +
+  xlab("position on 3L (Mb)") +
+  theme_bw() +
+  labs(color='intensity') +
+  theme( 
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor.y = element_blank())
+graphics.off()
+
+# one rep
+pdf("Figure3_supp_localization.1rep.pdf",width=7.5,height=5)
+ggplot(MM[MM$Pure_Rep_number==2 & MM$N_exp_reps==8 & MM$Ngen_Random_Mate==4,], aes(x=Pos_On_3L/1e6,y=LOD)) +
+  geom_line(aes(color=as.factor(Selection_Intensity))) +
+  facet_grid(N_RILs_base ~ Ne_Fly_DNA_pool,labeller=labeller(Ne_Fly_DNA_pool=as_labeller(appender_x),N_RILs_base=as_labeller(appender_y))) +
+  xlab("position on 3L (Mb)") +
+  theme_bw() +
+  labs(color='intensity') +
+  theme( 
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor.y = element_blank())
+graphics.off()
+
+####  lets look at expected LOD scores for loosely linked markers
+# position 60 is causative, therefore
+mycause = sort(as.numeric(levels(factor(MM$Pos_On_3L))))[60]
+
+# Lets look more at the False positve rate, or the distribution of LOD scores >7Mb away from the QTL
+cols=c("N_RILs_base","Ne_Fly_DNA_pool","Ngen_Random_Mate","N_exp_reps")
+FPR = MM%>%
+	filter(abs(Pos_On_3L - mycause) > 7e6 ) %>%
+	group_by(N_RILs_base, Selection_Intensity, Ne_Fly_DNA_pool, Ngen_Random_Mate, N_exp_reps) %>%
+	summarize(mLOD=mean(LOD))
+FPR[cols] <- lapply(FPR[cols], factor) 
+FPR$I = factor(paste0(round(100*FPR$Selection_Intensity,0),"%"),levels=c("5%","10%","20%"))
+
+anova(lm(mLOD~ N_RILs_base + I + Ne_Fly_DNA_pool + Ngen_Random_Mate + N_exp_reps, data=FPR))	
+
+Response: mLOD
+                     Df  Sum Sq Mean Sq  F value    Pr(>F)    
+N_RILs_base           3 0.61021 0.20340  254.021 < 2.2e-16 ***
+I                     2 0.10493 0.05247   65.521 < 2.2e-16 ***
+Ne_Fly_DNA_pool       2 1.64551 0.82276 1027.495 < 2.2e-16 ***
+Ngen_Random_Mate      2 0.89248 0.44624  557.286 < 2.2e-16 ***
+N_exp_reps            2 0.08148 0.04074   50.878 < 2.2e-16 ***
+Residuals           312 0.24983 0.00080    
+
+##### plot average LOD scores at a loosely linked marker
+
+FPR$combo = FPR$I:FPR$N_exp_reps
+pdf("Supp_Figurexx_NRILs_looselink.pdf",width=8,height=7)
+ggplot(FPR, aes(x=combo,y=mLOD)) +
+  geom_point(aes(color=as.factor(Ngen_Random_Mate))) +
+  facet_grid(N_RILs_base ~ Ne_Fly_DNA_pool,labeller = label_both) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  xlab("Sel Intensity : Num Exp Reps") +
+  ylab("average LOD loose linkage") +
+  labs(color = "N_G_Mate") +
+  theme( 
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor.y = element_blank())
+graphics.off()
+
+#########   check false positive rates based on two equal sized draws
+# nLOD is the LOD score from two equal size draws
+
+MM3 = MM %>%
+	group_by(N_RILs_base, Selection_Intensity, Ne_Fly_DNA_pool, Ngen_Random_Mate, N_exp_reps, Pure_Rep_number) %>%
+	summarize(MXnLOD=max(nLOD)) %>%
+	ungroup() %>% 
+	group_by(N_RILs_base, Selection_Intensity, Ne_Fly_DNA_pool, Ngen_Random_Mate, N_exp_reps) %>%
+	summarize(FPR=sum(MXnLOD > 4)) %>%
+	mutate(gFPR = 1-(1-FPR/250)^5)        # genome wide rate
+
+MM4 = MM3[MM3$Ne_Fly_DNA_pool>200,]
+	
+mean FPR all data = 7.1%  (per genome scan)
+mean FPR fly_pool > 200 = 3.9%  (per genome scan)
+
+######## threshold of 4 is OK ... but some conditions can have a slightly higher FPR
+######## increasing N experimental replicates or number of flies in the pool increases power and LOWERS FPR at 0.05
+
+######  now calculate support intervals
+# resolution
+MMint = MM %>%
+	group_by(N_RILs_base, Selection_Intensity, Ne_Fly_DNA_pool, Ngen_Random_Mate, N_exp_reps, Pure_Rep_number) %>%
+	summarize(myint = sum(LOD > (max(LOD)-2)), foundpeak = max(LOD)>4) %>%
+	ungroup() %>%
+	filter(foundpeak==TRUE) %>%
+	group_by(N_RILs_base, Selection_Intensity, Ne_Fly_DNA_pool, Ngen_Random_Mate, N_exp_reps) %>%
+	summarize(myint2 = 200*mean(myint))   # since each interval is 200kb in Libby's steps
+
+out = lm(myint2 ~ as.factor(N_RILs_base) + as.factor(Selection_Intensity) + as.factor(Ne_Fly_DNA_pool) + as.factor(Ngen_Random_Mate) + as.factor(N_exp_reps), data=MMint)
+MMint %>% filter(Selection_Intensity==0.1 & Ne_Fly_DNA_pool==600 & Ngen_Random_Mate==4 & N_exp_reps==8) %>% summary
+MMint %>% filter(Selection_Intensity==0.05 & Ne_Fly_DNA_pool==300 & Ngen_Random_Mate==4 & N_exp_reps==8) %>% summary
+
+####  .... it looks like support intervals under several conditions are approaching the coarse marker density
+####  .... but these simulations are pretty computationally intensive
+####  .... so I have to think about looking at resolution for a subset of interesting cases, and markers near the QTL
+
+

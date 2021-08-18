@@ -1,0 +1,45 @@
+#######################
+#### call haplotypes...
+#######################
+
+# haplotype call real data & pool data
+qsub -t 1 scripts/haplotyper.justhapfreq.sh helperfile/justhaps.samples.txt July24 July24/SNP.accuracy.freq.txt helperfile/founders.txt
+qsub -t 2-24 scripts/haplotyper.justhapfreq.sh helperfile/justhaps.samples.txt July24 July24/SNP.accuracy.freq.txt helperfile/founders.txt
+qsub -t 1-12 scripts/haplotyper.justhapfreq.sh helperfile/haplotype.samples.pool.experiment.txt accuracyhap accuracyhap/SNP.accuracy.freq.txt helperfile/founders.txt
+
+# merge real data & pool data
+#read
+cat July24/B.T.T_hap_freq.txt | head -n 1 > July24/allhaps.txt
+awk FNR-1 July24/*_hap_freq.txt >> July24/allhaps.txt
+cat July24/allhaps.txt | gzip -c > allhaps.200kb.txt.gz
+
+#pool
+cat accuracyhap/A_hap_freq.txt | head -n 1 > accuracyhap/accuracyhap.txt
+awk FNR-1 accuracyhap/*_hap_freq.txt >> accuracyhap/accuracyhap.txt
+cat accuracyhap/accuracyhap.txt | gzip -c > accuracyhap.200kb.txt.gz
+
+###  testing
+pool="A.T.100"
+OutName="A.T.F"
+folder="newhap"
+SNPtable="SNP.freq.txt"
+foundernames="founders.txt"
+
+library(limSolve)
+source("scripts/haplotyper.justhapfreq.code.R")
+runscan(pool, OutName, folder, SNPtable, foundername)
+### end testing
+
+######################
+## done calling haplotypes
+######################
+
+allhaps.txt has the following columns
+1.  chr
+2.	pos
+3.	pool name
+4.	founder name
+5.	adjusted haplotype frequency estimate
+###############
+
+

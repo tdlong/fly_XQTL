@@ -1,0 +1,42 @@
+###########################
+#####  Figure 1
+#####  an example of haplotype blocks
+###########################
+
+library(RColorBrewer)
+mycols=brewer.pal(8, "Set1")
+
+BREAKS=10
+BH=matrix(nrow=1000,ncol=1000)
+for(i in 1:1000){
+	br=c(round(1000*sort(runif(BREAKS-1)),0),1000)
+	geno=sample(1:8,BREAKS,replace=TRUE)
+	temp=rep(geno[1],br[1])
+	for(j in 2:BREAKS){
+		temp=c(temp,rep(geno[j],br[j]-br[j-1]))	
+		}
+	BH[i,]=temp
+	}
+
+g = rnorm(8)
+gg = g[BH[,500]]
+# heritability = 50% and haploid model
+Phen = gg + rnorm(1000,0,sqrt(var(gg)))
+BHs = BH[order(Phen,decreasing=TRUE)[1:50],]
+
+tiff("Fig1.graphics.for.Stuart.tiff",width=4,height=6,units="in",res=600)
+par(mfrow=c(3,1))
+boxplot(Phen~BH[,500],col=mycols,xlab="founder",ylab="average phenotype")
+image(t(BHs),col=mycols,axes=F)
+image(t(BH[1:50,]),col=mycols,axes=F)
+graphics.off()
+
+
+fBH = apply(BH,2,function(x) table(factor(x,levels=1:8)))
+fBHs = apply(BHs,2,function(x) table(factor(x,levels=1:8)))
+fB = apply(rbind(fBH,fBHs),2,function(x) -log10(chisq.test(matrix(x,ncol=2))$p.value))
+
+#########################
+###  done Figure 1
+#########################
+
