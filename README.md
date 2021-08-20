@@ -4,7 +4,8 @@
 ### There are folders for notes, scripts, helperfiles:  
 -notes contain text files to reproduce results in the paper  
 -scripts are scripts that are required (typically bash/R/python)  
--helpfiles are various files used by the scripts   
+-helpfiles are various files used by the scripts  
+-some of the scripts (\*.sh files) assume SGE some SLURM (over time I will migtrate to all SLURM).
 ### notes:  
 * raw.data.txt  
   * code to massage the raw data, including fastq file to treatments, and SRA info
@@ -13,7 +14,7 @@
 * call.SNPs.txt
   * code to call SNPs by sample.  We call at a fixed set of HQ SNPs based on founders. In the pools for each SNP we calculate the frequency of the ALT allele
 * call.haplotypes.txt
- * call haplotypes separately by pooled sample using "limSolve" (see paper and Linder et al 2020).  Requires a pooled sample, and founder bams
+  * call haplotypes separately by pooled sample using "limSolve" (see paper and Linder et al 2020).  Requires a pooled sample, and founder bams
 * figure1.txt
   * code to generate representative haplotypes for Figure 1
 * figure2.txt
@@ -33,5 +34,5 @@
 * haplotype.change.at.QTL.txt
   * code to reproduce Figure 5, showing changes in haplotypes at QTL (and local LOD scores)
 
-### if analyzing real data
+### If you are analyzing real data (and do not wish to reproduce simulations)
 * raw.data.txt -> make.bams.txt -> call.SNPs.txt -> call.haplotypes.txt -> manhattan.txt -> haplotype.change.at.QTL.txt
