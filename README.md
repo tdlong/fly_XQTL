@@ -30,3 +30,8 @@
   * code to reproduce the Manhattan plots (Fig 4 and Supp Fig 4), including code to make manhattan plots more generally (qqman wasn't flexible enough!)
 * QQplot.txt
   * code to reproduce the QQ plot of Supp Figure 3
+* haplotype.change.at.QTL.txt
+  * code to reproduce Figure 5, showing changes in haplotypes at QTL (and local LOD scores)
+
+### if analyzing real data
+* raw.data.txt -> make.bams.txt -> call.SNPs.txt -> call.haplotypes.txt -> manhattan.txt -> haplotype.change.at.QTL.txt
