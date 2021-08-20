@@ -1,0 +1,95 @@
+################
+## freq at QTL plots
+################
+
+# call peaks
+hits = chi2 %>%
+     filter(cov=="F") %>%
+     select(-cov) %>%
+     mutate(rpos = 1e6*round(pos/1e6,0)) %>%
+     group_by(chr,rpos) %>%
+     filter(LOD_full == max(LOD_full)) %>%
+     filter(LOD_full>4.5)
+
+hits2 = hits[-c(4,5,7,8,10,11,12,14,15,16,18),]
+
+myLODs = chi2 %>% filter(cov=="Q") %>% select(chr,pos,LOD_full) %>% droplevels()
+myFs = xx %>% filter(!is.na(freq)) %>% 
+	separate(pool,c("rep","trt","cov")) %>%
+	filter(cov==25) %>%
+	filter(chr != "chr4") %>%
+	select(-cov) %>%
+	droplevels() %>%
+	pivot_wider(names_from = trt, values_from = freq) %>%
+	mutate(freqdff = T-C) %>%
+	group_by(chr,pos,founder) %>%
+	summarize(mfreqdff = mean(freqdff)) %>%
+	select(chr,pos,founder,mfreqdff)
+	
+g_legend<-function(a.gplot){
+  tmp <- ggplot_gtable(ggplot_build(a.gplot))
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+  legend <- tmp$grobs[[leg]]
+  return(legend)}
+
+library(gridExtra)
+library("ggplotify")
+
+# library(cowplots)
+LODPLOT = list()
+FREQPLOT = list()
+
+	for(i in 1:7){
+		locchr=hits2$chr[i]
+		locpos = hits2$pos[i]
+		left= locpos - 2000000
+		right= locpos + 2000000
+		myLODstemp = myLODs %>% filter(chr==locchr & pos > left & pos < right)
+		myFstemp =  myFs %>% filter(chr==locchr & pos > left & pos < right)
+		
+		LODPLOT[[i]] = ggplot(myLODstemp, aes(x=pos/1000, y=LOD_full)) +
+			geom_line() +
+			ylab("-log10(p)") +
+			xlab("Physical Location (kb)") +
+			geom_hline(yintercept = 4, linetype = "dashed", colour = "blue") +  
+			geom_vline(xintercept = locpos/1000, linetype = "dashed", colour = "blue") +  
+			# Custom the theme:
+			theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank()) + 
+			theme(axis.text=element_text(size=8),axis.title=element_text(size=10)) + 
+			theme(legend.position = "none") + 
+			theme(axis.title.x=element_blank()) + 
+			theme(axis.text.x=element_blank())
+
+		FREQPLOT[[i]] = ggplot(myFstemp, aes(x=pos/1000, y=mfreqdff, group=founder)) +
+			geom_line(aes(color=founder)) +
+			ylab("freq change") +
+			xlab("Physical Location (kb)") +
+			geom_vline(xintercept = locpos/1000, linetype = "dashed", colour = "blue") +  
+			# Custom the theme:
+			theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank()) + 
+			theme(axis.text=element_text(size=8),axis.title=element_text(size=10)) + 
+			theme(legend.position = "none")
+
+		if(i == 1){
+			Wantlegend = ggplot(myFstemp, aes(x=pos/1000, y=mfreqdff, group=founder)) +
+				geom_line(aes(color=founder)) +
+				theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank()) + 
+				theme(axis.text=element_text(size=8),axis.title=element_text(size=10)) +
+				theme(legend.direction = "horizontal", legend.position = "bottom", legend.box = "horizontal")
+			Mylegend = g_legend(Wantlegend)
+
+			}
+	}
+	
+
+lay = rbind(c(1,2),c(8,9), c(3,4),c(10,11), c(5,6),c(12,13), c(7,15),c(14,15))
+
+# no
+grid.arrange(grobs = c(LODPLOT,FREQPLOT,mylegend), heights = c(1,2,1,2,1,2,1,2), layout_matrix = lay)
+# no
+grid.arrange(c(LODPLOT,FREQPLOT), Mylegend, heights = c(1,2,1,2,1,2,1,2), layout_matrix = lay)
+# yes
+grid.arrange(LODPLOT[[1]], LODPLOT[[2]], LODPLOT[[3]], LODPLOT[[4]], LODPLOT[[5]], LODPLOT[[6]], LODPLOT[[7]],
+	FREQPLOT[[1]], FREQPLOT[[2]], FREQPLOT[[3]], FREQPLOT[[4]], FREQPLOT[[5]], FREQPLOT[[6]], FREQPLOT[[7]],
+	Mylegend, heights = c(1,2,1,2,1,2,1,2), layout_matrix = lay)
+
